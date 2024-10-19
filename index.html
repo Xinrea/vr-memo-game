@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VR信记忆力</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            background-color: #f5f5f5;
+            color: #333;
+            box-sizing: border-box;
+        }
+        h1 {
+            font-size: 20px;
+            color: #333;
+            margin: 10px 0;
+            text-align: center;
+        }
+        #game-container {
+            flex: 1;
+            overflow-y: auto;
+            background-color: white;
+            padding: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* 居中对齐内容 */
+            text-align: center; /* 文字居中 */
+        }
+        #pattern {
+            margin: 10px 0;
+        }
+        #options {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 5px;
+            margin-top: 10px;
+        }
+        button {
+            font-size: 14px;
+            padding: 8px 16px;
+            cursor: pointer;
+            background-color: #f0f0f0;
+            color: #333;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.2s ease;
+        }
+        button:hover {
+            background-color: #e0e0e0;
+        }
+        #score, #feedback, #high-score, #hint {
+            margin: 5px 0;
+        }
+        #high-score {
+            font-size: 12px;
+            color: #666;
+        }
+        #score {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        #feedback {
+            height: 20px;
+            font-size: 14px;
+            color: #ff5722;
+        }
+        #hint {
+            font-size: 12px;
+            color: #666;
+            font-style: italic;
+        }
+        #pattern img, #options button img {
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #fff;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+        #pattern img {
+            width: 80px;
+            height: 80px;
+        }
+        #options button {
+            padding: 5px;
+            border: none;
+            border-radius: 5px;
+            margin: 5px;
+            background-color: transparent;
+        }
+        #options button img {
+            width: 60px;
+            height: 60px;
+            vertical-align: middle;
+        }
+        #pattern, #options button {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #pattern div, #options button div {
+            margin-top: 5px;
+            font-size: 12px;
+        }
+        footer {
+            background-color: #333;
+            color: #fff;
+            padding: 10px;
+            font-size: 12px;
+            text-align: center;
+        }
+        footer p {
+            margin: 5px 0;
+        }
+        footer a {
+            color: #4CAF50; /* 添加这行来改变链接颜色 */
+            text-decoration: none; /* 可选:移除下划线 */
+        }
+        footer a:hover {
+            text-decoration: underline; /* 可选:鼠标悬停时添加下划线 */
+        }
+    </style>
+</head>
+<body>
+    <h1>VR信记忆力</h1>
+    <div id="game-container">
+        <div id="high-score">最高记录：0</div>
+        <div id="score">得分：0</div>
+        <div id="feedback"></div>
+        <div id="pattern"></div>
+        <div id="hint"></div>
+        <div id="options"></div>
+    </div>
+    <footer>
+        <p>1. “借鉴”自 Nintendo Switch 游戏《脑锻炼》中的小游戏</p>
+        <p>2. 所用头像图片均来自 VirtuaReal 官网，版权属于 VirtuaReal</p>
+        <p>3. 本游戏 99% 的代码由 Cursor 生成，AI 驾驶员为 <a href="https://github.com/Xinrea">@Xinrea</a></p>
+    </footer>
+    <script>
+        const patterns = [
+            'aza', 'azi', 'eine', 'hatsuse', 'joi', 'kiti', 'kouichi', 'mayumi', 
+            'miki', 'mizuki', 'nagisa', 'nanami', 'shiori', 'sui', 'tocci', 
+            'xiaoke', 'yukie', 'yukisyo'
+        ];
+
+        const chineseNames = {
+            'aza': 'AZA',
+            'azi': '阿梓',
+            'eine': '艾因',
+            'hatsuse': '初濑',
+            'joi': '轴伊',
+            'kiti': '吉吉',
+            'kouichi': '光一',
+            'mayumi': '勾勾',
+            'miki': '弥希',
+            'mizuki': '弥月',
+            'nagisa': '米汀',
+            'nanami': '七海',
+            'shiori': '栞栞',
+            'sui': '岁己',
+            'tocci': '桃星',
+            'xiaoke': '小可',
+            'yukie': '雪绘',
+            'yukisyo': '雪烛'
+        };
+
+        let currentPattern = '';
+        let patternHistory = [];
+        let totalScore = 0;
+        let currentLevelScore = 0;
+        let currentRound = 0;
+        let difficultyLevel = 1;
+        let highScore = localStorage.getItem('highScore') || 0;
+
+        function getImage(name) {
+            return `assets/${name}.png`;
+        }
+
+        function updateScore() {
+            document.getElementById('score').textContent = `总分：${totalScore} | 难度：${difficultyLevel} | 当前进度：${currentLevelScore}/10`;
+            document.getElementById('high-score').textContent = `最高记录：${highScore}`;
+        }
+
+        function showFeedback(message) {
+            const feedbackElement = document.getElementById('feedback');
+            feedbackElement.textContent = message;
+            setTimeout(() => {
+                feedbackElement.textContent = '';
+            }, 2000);
+        }
+
+        function showPattern() {
+            if (currentPattern) {
+                patternHistory.unshift(currentPattern);
+            }
+            console.log(patternHistory);
+            currentPattern = patterns[Math.floor(Math.random() * patterns.length)];
+            const patternElement = document.getElementById('pattern');
+            patternElement.innerHTML = `
+                <img src="${getImage(currentPattern)}" alt="${chineseNames[currentPattern]}">
+                <div>${chineseNames[currentPattern]}</div>
+            `;
+            
+            currentRound++;
+            if (currentRound <= difficultyLevel) {
+                showSkipButton();
+                updateHint();
+            } else {
+                showOptions();
+            }
+        }
+
+        function updateHint() {
+            const hintElement = document.getElementById('hint');
+            if (currentRound <= difficultyLevel) {
+                hintElement.textContent = `记住这个 VUP：${chineseNames[currentPattern]}（${currentRound}/${difficultyLevel}）`;
+            } else {
+                hintElement.textContent = `选择${difficultyLevel}次之前显示的VUP`;
+            }
+        }
+
+        function showSkipButton() {
+            const optionsContainer = document.getElementById('options');
+            optionsContainer.innerHTML = '';
+            const skipButton = document.createElement('button');
+            skipButton.textContent = '下一个';
+            skipButton.onclick = showPattern;
+            optionsContainer.appendChild(skipButton);
+        }
+
+        function showOptions() {
+            const optionsContainer = document.getElementById('options');
+            optionsContainer.innerHTML = '';
+            
+            // 确保正确答案在选项中
+            let correctAnswer = patternHistory[difficultyLevel - 1];
+            let options = [correctAnswer];
+            
+            // 从剩余的图片中随机选择两个，不包括正确答案和当前显示的图案
+            let remainingPatterns = patterns.filter(p => p !== correctAnswer && p !== currentPattern);
+            while (options.length < 3 && remainingPatterns.length > 0) {
+                let randomIndex = Math.floor(Math.random() * remainingPatterns.length);
+                options.push(remainingPatterns[randomIndex]);
+                remainingPatterns.splice(randomIndex, 1);
+            }
+            
+            // 打乱选项顺序
+            options = options.sort(() => Math.random() - 0.5);
+
+            options.forEach(pattern => {
+                const button = document.createElement('button');
+                button.innerHTML = `
+                    <img src="${getImage(pattern)}" alt="${chineseNames[pattern]}">
+                    <div>${chineseNames[pattern]}</div>
+                `;
+                button.onclick = () => checkAnswer(pattern);
+                optionsContainer.appendChild(button);
+            });
+
+            document.getElementById('hint').textContent = `选择${difficultyLevel}次之前显示的VUP`;
+        }
+
+        function checkAnswer(selectedPattern) {
+            const correctPattern = patternHistory[difficultyLevel - 1];
+            if (selectedPattern === correctPattern) {
+                totalScore++;
+                currentLevelScore++;
+                updateScore();
+                if (totalScore > highScore) {
+                    highScore = totalScore;
+                    localStorage.setItem('highScore', highScore);
+                    updateScore();
+                }
+                if (currentLevelScore === 10) {
+                    difficultyLevel++;
+                    showFeedback(`恭喜！完成第${difficultyLevel-1}关。进入第${difficultyLevel}关。`);
+                    resetLevel();
+                } else {
+                    showPattern();
+                }
+            } else {
+                showGameOverScreen(correctPattern);
+            }
+        }
+
+        function showGameOverScreen(correctPattern) {
+            const gameContainer = document.getElementById('game-container');
+            gameContainer.innerHTML = `
+                <h2>游戏结束</h2>
+                <div id="high-score">最高记录：${highScore}</div>
+                <div id="score">总分：${totalScore} | 难度：${difficultyLevel} | 当前进度：${currentLevelScore}/10</div>
+                <p>正确答案是: ${chineseNames[correctPattern]}</p>
+                <p>本轮出现的顺序:</p>
+                <div id="pattern-history" style="display: flex; justify-content: center; align-items: center; flex-wrap: wrap; margin-bottom: 10px;"></div>
+                <button id="restart-button">重新开始</button>
+            `;
+
+            const patternHistoryContainer = document.getElementById('pattern-history');
+            // 反转顺序并显示当前难度的所有记录
+            patternHistory.slice(0, currentRound).reverse().forEach((pattern, index) => {
+                patternHistoryContainer.innerHTML += `
+                    <div style="text-align: center; margin: 0 10px; font-size: 12px;">
+                        <img src="${getImage(pattern)}" alt="${chineseNames[pattern]}" style="width: 30px; height: 30px;">
+                        <div>${index + 1}. ${chineseNames[pattern]}</div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('restart-button').onclick = resetGame;
+        }
+
+        function resetLevel() {
+            currentLevelScore = 0;
+            currentRound = 0;
+            currentPattern = '';
+            patternHistory = [];
+            updateScore();
+            showPattern();
+        }
+
+        function resetGame() {
+            totalScore = 0;
+            currentLevelScore = 0;
+            currentRound = 0;
+            currentPattern = '';
+            difficultyLevel = 1;
+            patternHistory = [];
+            
+            const gameContainer = document.getElementById('game-container');
+            gameContainer.innerHTML = `
+                <div id="high-score">最高记录：0</div>
+                <div id="score">得分：0</div>
+                <div id="feedback"></div>
+                <div id="pattern"></div>
+                <div id="hint"></div>
+                <div id="options"></div>
+            `;
+            
+            updateScore();
+            showPattern();
+        }
+
+        updateScore();
+        showPattern();
+    </script>
+</body>
+</html>
